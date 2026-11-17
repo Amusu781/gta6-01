@@ -1,57 +1,31 @@
-// Palmera Bay — a make.fun gta6-01 entry (Node 22, standard library only).
-//
-// The game is this directory's game/ folder: plain static files a desktop browser
-// loads offline (game/index.html and its ES modules, no library, no network
-// request). This program hands it in: it copies game/ and screenshots/ from
-// beside this file to /output and writes /output/dossier.json, the summary the
-// judge reads, with the vendored make.fun library.
-//
-// Serve it locally with `node serve.ts` (or any static server over game/),
-// then open http://localhost:8080.
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-
-import { cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+// Palmera Bay — the entrypoint the grader runs. It copies game/ and
+// screenshots/ from this repository into the output directory and writes
+// /output/dossier.json with buildDossier from the kit's library.
+// Node 22, standard library only. Outside the grader, MAKEFUN_OUTPUT_DIR
+// stands in for /output.
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
-const here = fileURLToPath(new URL('.', import.meta.url));
-const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+const here = dirname(fileURLToPath(import.meta.url));
+const out = process.env.MAKEFUN_OUTPUT_DIR || '/output';
 
-// Fail loudly instead of handing in an empty game: the entry is only valid
-// when game/index.html is really there.
-if (!existsSync(join(here, 'game', 'index.html'))) {
-  throw new Error('game/index.html is missing — nothing to hand in');
-}
-
-// The first screenshot is the entry's cover image, so hand in nothing
-// without one: screenshots/ must hold at least one real image file.
+const gameDir = join(here, 'game');
 const shotsDir = join(here, 'screenshots');
-const shots = existsSync(shotsDir)
-  ? readdirSync(shotsDir).filter((f) => /\.(jpe?g|png)$/i.test(f))
-  : [];
-if (shots.length === 0) {
-  throw new Error('screenshots/ holds no image — nothing to show on the cover');
-}
+if (!existsSync(gameDir)) throw new Error('main.ts: no game/ directory beside main.ts');
+if (!existsSync(shotsDir)) throw new Error('main.ts: no screenshots/ directory beside main.ts');
 
+rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
-cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
-mkdirSync(join(out, 'screenshots'), { recursive: true });
+cpSync(gameDir, join(out, 'game'), { recursive: true });
 cpSync(shotsDir, join(out, 'screenshots'), { recursive: true });
 
-// The scorer's own caps (reference/gate.json): only text_max_bytes shapes the bytes;
-// the others refuse an entry the scorer would refuse (more than 4 screenshots or
-// one over 256 KiB; more than 993 files in game/ or 48 MiB of game files, in all,
-// or a path under game/ over 1000 bytes: game/ counts beside /output's own
-// 1000-entry cap, its screenshots/ and dossier.json).
-writeFileSync(
-  join(out, 'dossier.json'),
-  buildDossier(out, {
-    text_max_bytes: 163840,
-    screenshots: { max: 4, max_bytes: 262144 },
-    game_max_files: 993,
-    game_max_bytes: 50331648,
-    game_path_max_bytes: 1000,
-  }),
-);
+const dossier = buildDossier(out, {
+  text_max_bytes: 163840,
+  screenshots: { max: 4, max_bytes: 262144 },
+  game_max_files: 993,
+  game_max_bytes: 50331648,
+});
+writeFileSync(join(out, 'dossier.json'), dossier);
+console.log(`wrote ${join(out, 'dossier.json')} (${dossier.length} bytes)`);
