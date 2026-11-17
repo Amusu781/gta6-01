@@ -1,38 +1,45 @@
-// Saving to localStorage: cash, the debt, which missions are done, where Rico is,
-// and which car he owns. Nothing leaves the browser.
+// Save and load, through localStorage. One key, one small JSON object:
+// cash, debt, missions done, ammo and health. Saving never throws — a
+// full or blocked store just means the run is not persisted.
 import { SAVE_KEY } from './config.js';
 
-export function saveGame(world) {
+export function saveGame(W) {
   try {
     const data = {
-      v: 1,
-      cash: Math.round(world.cash),
-      debt: Math.round(world.debt),
-      missionsDone: world.missionsDone.slice(),
-      player: { x: world.player.x, y: world.player.y },
-      car: world.player.car ? { x: world.player.car.x, y: world.player.car.y, angle: world.player.car.angle, color: world.player.car.color, model: world.player.car.model } : null,
-      time: world.time,
-      savedAt: Date.now(), // when this save was written; load ignores it, it is for debugging
+      cash: W.cash,
+      debt: W.debt,
+      missionsDone: W.missionsDone,
+      ammo: W.player.ammo,
+      health: W.player.health,
     };
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    return true;
   } catch {
-    return false;
+    // A blocked store must never break the game.
   }
 }
 
-export function loadGame() {
+export function loadSave() {
   try {
     const raw = window.localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (!data || data.v !== 1) return null;
-    return data;
+    if (typeof data.cash !== 'number' || typeof data.debt !== 'number') return null;
+    return {
+      cash: data.cash,
+      debt: data.debt,
+      missionsDone: Array.isArray(data.missionsDone) ? data.missionsDone : [],
+      ammo: typeof data.ammo === 'number' ? data.ammo : 24,
+      health: typeof data.health === 'number' ? data.health : 100,
+    };
   } catch {
     return null;
   }
 }
 
 export function clearSave() {
-  try { window.localStorage.removeItem(SAVE_KEY); } catch { /* storage unavailable */ }
+  try {
+    window.localStorage.removeItem(SAVE_KEY);
+  } catch {
+    // ignore
+  }
 }

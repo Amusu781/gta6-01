@@ -1,97 +1,66 @@
-// Palmera Bay — configuration: world size, palette, tuning, locations.
-// Everything original: a fictional sun-soaked coastal city, its own names and story.
-export const VIEW_W = 1280;
-export const VIEW_H = 720;
+// Palmera Bay — tuning and world constants. All numbers live here so the
+// rest of the game reads like a design, not a spreadsheet.
 export const WORLD_W = 3600;
-export const WORLD_H = 2600;
-export const ROAD_W = 92;
+export const WORLD_H = 2700;
+export const ROAD_W = 120;
+// Road centrelines. The city is a grid; blocks between roads hold buildings.
+export const V_ROADS = [300, 900, 1500, 2100, 2700, 3300];
+export const H_ROADS = [300, 900, 1500, 2100];
+export const START_CASH = 120;
+export const START_DEBT = 5000;
+export const START_HEALTH = 100;
+export const START_AMMO = 24;
+export const MAX_AMMO = 24;
+export const MAX_WANTED = 3;
+export const PLAYER_FOOT_SPEED = 210;
+export const CAR_TOP_SPEED = 430;
+export const CAR_ACCEL = 320;
+export const CAR_BRAKE = 520;
+export const CAR_TURN = 2.6;
+export const BULLET_SPEED = 760;
+export const BULLET_RANGE = 520;
+export const BULLET_DAMAGE = 1;
+export const COP_HEALTH = 3;
+export const RAM_DAMAGE = 8;
+export const RAM_COOLDOWN = 0.8;
+export const WANTED_DECAY_SECONDS = 25;
+export const INTERACT_RANGE = 110;
 export const SAVE_KEY = 'palmera-bay-save-v1';
-
-// Avenues (vertical roads) and streets (horizontal roads) of the city grid.
-export const AVENUES = [300, 800, 1300, 1800, 2300, 2800, 3300];
-export const STREETS = [300, 700, 1100, 1500, 1900, 2300];
-export const BEACH_Y = 2420; // south of here: sand, then the bay itself.
-
-export const PALETTE = {
-  grass: '#7fae62',
-  grassDark: '#74a258',
-  sidewalk: '#d9cdb4',
-  road: '#4b4b55',
-  roadEdge: '#3a3a44',
-  dash: '#e8c84a',
-  sand: '#ecd6a0',
-  water: '#2aa7c9',
-  waterDeep: '#1d86ad',
-  park: '#6da34f',
-  buildingRoof: ['#e07856', '#e8a34c', '#d95f7a', '#5f8fd9', '#8f6fd0', '#e8d44c', '#6fc2a8', '#c97b4a'],
-  buildingEdge: '#00000033',
-  carColors: ['#d9382b', '#2b6fd9', '#e8b62a', '#3aa655', '#7a4fd0', '#e8e8e8', '#22242a', '#e8782a', '#2ab5c9', '#c92a7a'],
-  pedShirts: ['#f2f2f2', '#ffd23e', '#3ec6ff', '#ff7a59', '#9dff57', '#ff5fa2', '#b388ff', '#ff9f1c'],
+// Places the story uses. The driver teleports the player near the garage
+// (470, 470) and delivers to the spray shop (3150, 2150); keep both exact.
+export const GARAGE = { x: 470, y: 470, label: "Marla's Garage" };
+export const SPRAY_SHOP = { x: 3150, y: 2150, label: 'Spray & Go' };
+export const PIER = { x: 3300, y: 300, label: 'Old Pier' };
+export const CREW_SPOT = { x: 900, y: 2100, label: 'Crew corner' };
+export const PLAYER_SPAWN = { x: 470, y: 560 };
+// Palette.
+export const COLORS = {
+  grass: '#6f9e57',
+  grassAlt: '#679452',
+  road: '#33373d',
+  roadEdge: '#4a4f57',
+  lane: '#d8c95a',
+  sidewalk: '#9aa0a8',
+  buildingRoof: ['#c96f4a', '#4a7ec9', '#c9a44a', '#7a4ac9', '#4ac9a0', '#c94a6b'],
+  buildingEdge: '#2c2f34',
+  water: '#3f7fb8',
+  pierWood: '#8a6a45',
+  player: '#ff5a3c',
+  playerDark: '#c23a22',
+  ped: ['#f2d16b', '#6bc9f2', '#f28bb0', '#9bf26b', '#f2a35e'],
+  copBody: '#22262b',
+  copTrim: '#f2f2f2',
+  bullet: '#ffe066',
+  minimapBg: 'rgba(12, 16, 22, 0.82)',
+  hudBg: 'rgba(12, 16, 22, 0.72)',
+  hudText: '#f5f2e8',
+  hudAccent: '#ffd34d',
+  danger: '#ff5340',
 };
-
-export const TUNING = {
-  walkSpeed: 185,
-  runSpeed: 265,
-  carAccel: 300,
-  carBrake: 520,
-  carMaxSpeed: 430,
-  carMaxReverse: 150,
-  carSteer: 2.6,
-  carFriction: 0.55,
-  trafficSpeed: 135, // brisk enough that the streets feel alive, slow enough to dodge
-  pedSpeed: 55,
-  bulletSpeed: 720,
-  pistolDamage: 34,
-  copDamage: 9, // one police bullet; foot officers and Rico's own pistol share this table
-  punchDamage: 26,
-  punchRange: 46,
-  copShootRange: 430,
-  copShootInterval: 1.25,
-  vaultHoldSeconds: 6, // how long Rico must hold inside the bank vault (mission 3)
-  wantedDecayDelay: 14,
-  wantedDecayStep: 8,
-  healthRegenDelay: 8,
-  healthRegenRate: 6,
-  startCash: 120,
-  debtTotal: 5000,
-  respawnCost: 0.1,
-};
-
-// Named places in Palmera Bay. All fictional.
-export const PLACES = {
-  hideout: { name: 'Rico\u2019s Garage', x: 470, y: 470, r: 70, color: '#3aa655' },
-  sprayShop: { name: 'Sunset Spray Shop', x: 3150, y: 2150, r: 80, color: '#e8b62a' },
-  docks: { name: 'Marlin Docks', x: 420, y: 2260, r: 80, color: '#2ab5c9' },
-  hotel: { name: 'The Coral Hotel', x: 3150, y: 470, r: 80, color: '#c92a7a' },
-  bank: { name: 'Palmera Bay Bank', x: 1550, y: 850, r: 90, color: '#e8a34c' },
-  clinic: { name: 'Bay Clinic', x: 2050, y: 1250, r: 70, color: '#f2f2f2' },
-  park: { name: 'Flamingo Park', x: 1550, y: 1300, r: 150, color: '#6da34f' },
-};
-
-export const MISSION_DEFS = [
-  {
-    id: 'wheels',
-    title: 'Mission 1 — Wheels for Hire',
-    brief: 'Marla needs a driver with a car. Steal any car and bring it to the Sunset Spray Shop so it can\u2019t be traced.',
-    reward: 500,
-    startPlace: 'hideout',
-    startText: 'Press E at the garage to take the job.',
-  },
-  {
-    id: 'courier',
-    title: 'Mission 2 — The Courier',
-    brief: 'Pick up the package at the Marlin Docks and deliver it to The Coral Hotel in 150 seconds. A rival tipped off the cops — expect heat halfway there.',
-    reward: 1200,
-    startPlace: 'hideout',
-    startText: 'Press E at the garage to take the job.',
-    timeLimit: 150,
-  },
-  {
-    id: 'vault',
-    title: 'Mission 3 — The Vault Job',
-    brief: 'Hit the Palmera Bay Bank. Hold inside the vault marker for 6 seconds, then lose a 3-star wanted level and get back to the garage.',
-    reward: 3000,
-    startPlace: 'hideout',
-    startText: 'Press E at the garage to take the job.',
-  },
+export const CAR_MODELS = [
+  { model: 'Palm Runner', color: '#d94f3d' },
+  { model: 'Bay Cruiser', color: '#3d7fd9' },
+  { model: 'Sunset GT', color: '#e0a13c' },
+  { model: 'Harbor Van', color: '#7a8894' },
+  { model: 'Coral Coupe', color: '#c94f8a' },
 ];
