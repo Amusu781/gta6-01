@@ -1,146 +1,174 @@
-// The story: Rico works off a $5,000 debt to Marla Quinn, one job at a
-// time. Three story jobs, then repeatable fares. A mission is a small
-// state machine: take it at the garage, follow the marker, get paid.
-import { GARAGE, SPRAY_SHOP, PIER, CREW_SPOT, INTERACT_RANGE } from './config.js';
-import { dist } from './random.js';
-import { raiseWanted } from './actors.js';
+// Missions: three story jobs for Rico Vega, then repeatable taxi fares.
+// A job is { index, stage, timer, target, reward, done[] } and the update
+// step moves it forward when the player reaches a target. Rewards pay cash
+// and cut the $5,000 debt to Marla Quinn.
 
-export const STORY = [
-  {
-    id: 'wheels',
-    title: 'Wheels',
-    brief: "Marla needs a clean car. Steal any parked car and bring it to Spray & Go.",
-    reward: 500,
-  },
-  {
-    id: 'courier',
-    title: 'Courier Run',
-    brief: 'A package for the Old Pier. Take it there in 90 seconds — Marla hates late.',
-    reward: 700,
-    timeLimit: 90,
-  },
-  {
-    id: 'getaway',
-    title: 'Getaway',
-    brief: 'Pick up the crew at the corner, then lose the heat. Come back clean.',
-    reward: 900,
-  },
-];
+import {
+  STORY_JOBS, SPRAY_SHOP, PIER_DROP, DOCKS_DROP, GARAGE_DROP,
+  FARE_MIN, FARE_MAX, ROADS_V, ROADS_H, BAY_X,
+} from './config.js';
 
-function fareTarget(W) {
-  // A random road point far from the player, so the fare is a real drive.
-  for (let tries = 0; tries < 20; tries++) {
-    const x = W.rng.range(300, 3300);
-    const y = W.rng.range(300, 2400);
-    if (dist(x, y, W.player.x, W.player.y) > 900) return { x, y, label: 'Fare drop-off' };
-  }
-  return { x: 2100, y: 900, label: 'Fare drop-off' };
-}
-
-export function nextMissionDef(W) {
-  for (const def of STORY) {
-    if (!W.missionsDone.includes(def.id)) return { ...def, story: true };
-  }
-  return { id: `fare-${W.missionsDone.length}`, title: 'Fare', brief: 'Drive a passenger to the marker. Quick and quiet.', reward: 300 + W.rng.int(0, 3) * 100, story: false };
-}
-
-export function takeMission(W) {
-  if (W.mission) return false;
-  if (dist(W.player.x, W.player.y, GARAGE.x, GARAGE.y) > INTERACT_RANGE + 40) return false;
-  const def = nextMissionDef(W);
-  const m = {
-    id: def.id, title: def.title, reward: def.reward, story: def.story,
-    stage: 'go', target: null, timer: def.timeLimit || 0, timeLimit: def.timeLimit || 0,
+export function createMissions(rng) {
+  return {
+    index: 0, // 0..2 story jobs, then fares forever
+    stage: 'steal',
+    timer: 0,
+    target: { x: SPRAY_SHOP.x, y: SPRAY_SHOP.y, r: SPRAY_SHOP.r, label: SPRAY_SHOP.name },
+    reward: STORY_JOBS[0].reward,
+    done: [],
+    fare: null,
+    rng,
   };
-  if (def.id === 'wheels') {
-    m.stage = 'steal';
-    m.target = { x: GARAGE.x, y: GARAGE.y, label: 'Steal a parked car' };
-  } else if (def.id === 'courier') {
-    m.stage = 'pickup';
-    m.target = { x: GARAGE.x, y: GARAGE.y, label: 'Pick up the package' };
-  } else if (def.id === 'getaway') {
-    m.stage = 'pickup';
-    m.target = { x: CREW_SPOT.x, y: CREW_SPOT.y, label: 'Pick up the crew' };
-  } else {
+}
+
+function roadPoint(rng) {
+  const x = rng.pick(ROADS_V);
+  const y = rng.pick(ROADS_H);
+  return { x, y };
+}
+
+export function startJob(missions, index) {
+  missions.index = index;
+  missions.timer = 0;
+  missions.fare = null;
+  if (index === 0) {
+    missions.stage = 'steal';
+    missions.target = { x: SPRAY_SHOP.x, y: SPRAY_SHOP.y, r: SPRAY_SHOP.r, label: SPRAY_SHOP.name };
+    missions.reward = STORY_JOBS[0].reward;
+  } else if (index === 1) {
+    missions.stage = 'pickup';
+    missions.target = { x: PIER_DROP.x, y: PIER_DROP.y, r: PIER_DROP.r, label: PIER_DROP.name };
+    missions.reward = STORY_JOBS[1].reward;
+  } else if (index === 2) {
+    missions.stage = 'lose';
+    missions.target = null;
+    missions.reward = STORY_JOBS[2].reward;
+  }
+}
+
+export function startFare(missions) {
+  const rng = missions.rng;
+  const from = roadPoint(rng);
+  let to = roadPoint(rng);
+  while (Math.hypot(to.x - from.x, to.y - from.y) < 800) to = roadPoint(rng);
+  missions.index = 3;
+  missions.stage = 'fare-pickup';
+  missions.fare = { reward: Math.round(rng.range(FARE_MIN, FARE_MAX)) };
+  missions.target = { x: from.x, y: from.y, r: 100, label: 'the fare pickup' };
+  missions.reward = missions.fare.reward;
+  missions.timer = 0;
+}
+
+// Called when a job pays out. Returns the cash earned (0 when nothing did).
+export function updateMissions(world, dt) {
+  const m = world.missions;
+  const p = world.player;
+  const at = (t) => t && Math.hypot(p.x - t.x, p.y - t.y) < t.r;
+
+  if (m.stage === 'steal') {
+    // Done as soon as the player is driving a stolen car.
+    if (p.car && p.car.stolen) {
+      m.stage = 'deliver';
+      return { event: 'stolen', text: 'Nice wheels. Now bring it to Spray & Go.' };
+    }
+    return null;
+  }
+
+  if (m.stage === 'pickup' && at(m.target)) {
     m.stage = 'deliver';
-    m.target = fareTarget(W);
+    m.timer = 90;
+    m.target = { x: DOCKS_DROP.x, y: DOCKS_DROP.y, r: DOCKS_DROP.r, label: DOCKS_DROP.name };
+    return { event: 'pickup', text: 'Package secured. 90 seconds to the north docks!' };
   }
-  W.mission = m;
-  W.message = `${def.title}: ${def.brief}`;
-  W.messageTimer = 4;
-  W.audio.pickup();
-  return true;
-}
 
-function completeMission(W) {
-  const m = W.mission;
-  W.cash += m.reward;
-  W.debt = Math.max(0, W.debt - m.reward);
-  W.missionsDone.push(m.id);
-  W.mission = null;
-  W.message = `${m.title} done — $${m.reward}. Debt down to $${W.debt}.`;
-  W.messageTimer = 4;
-  W.audio.paid();
-  W.saveGame();
-}
-
-function failMission(W, why) {
-  W.mission = null;
-  W.message = why;
-  W.messageTimer = 3.5;
-}
-
-export function updateMission(W, dt) {
-  const m = W.mission;
-  if (!m) return;
-  const p = W.player;
-  if (m.timeLimit > 0) {
-    m.timer -= dt;
-    if (m.timer <= 0) {
-      failMission(W, `${m.title} failed — too slow. Marla is not pleased.`);
-      return;
+  if (m.stage === 'deliver') {
+    if (m.index === 1) {
+      m.timer -= dt;
+      if (m.timer <= 0) {
+        startJob(m, 1);
+        return { event: 'failed', text: 'Too slow — Marla wants that package again.' };
+      }
     }
+    if (at(m.target)) {
+      return completeJob(world);
+    }
+    return null;
   }
-  if (m.id === 'wheels') {
-    if (m.stage === 'steal' && p.car) {
+
+  if (m.stage === 'lose') {
+    if (world.wanted === 0) {
       m.stage = 'deliver';
-      m.target = { x: SPRAY_SHOP.x, y: SPRAY_SHOP.y, label: 'Deliver to Spray & Go' };
-      W.message = 'Nice wheels. Now get it to Spray & Go.';
-      W.messageTimer = 3;
-    } else if (m.stage === 'deliver' && p.car && dist(p.x, p.y, SPRAY_SHOP.x, SPRAY_SHOP.y) < 140) {
-      completeMission(W);
+      m.target = { x: GARAGE_DROP.x, y: GARAGE_DROP.y, r: GARAGE_DROP.r, label: GARAGE_DROP.name };
+      return { event: 'clear', text: 'Heat is off. Get to the garage.' };
     }
-  } else if (m.id === 'courier') {
-    if (m.stage === 'pickup' && dist(p.x, p.y, GARAGE.x, GARAGE.y) < INTERACT_RANGE) {
-      m.stage = 'deliver';
-      m.target = { x: PIER.x, y: PIER.y, label: 'Deliver to the Old Pier' };
-      W.message = 'Package in hand. Ninety seconds. Go.';
-      W.messageTimer = 3;
-    } else if (m.stage === 'deliver' && dist(p.x, p.y, PIER.x, PIER.y) < 130) {
-      completeMission(W);
-    }
-  } else if (m.id === 'getaway') {
-    if (m.stage === 'pickup' && dist(p.x, p.y, CREW_SPOT.x, CREW_SPOT.y) < 130) {
-      m.stage = 'lose';
-      m.target = null;
-      raiseWanted(W, 1);
-      W.message = 'Crew aboard — now lose the heat!';
-      W.messageTimer = 3;
-    } else if (m.stage === 'lose' && W.wanted === 0) {
-      completeMission(W);
-    }
-  } else if (m.stage === 'deliver' && dist(p.x, p.y, m.target.x, m.target.y) < 130) {
-    completeMission(W);
+    return null;
   }
+
+  if (m.stage === 'fare-pickup' && at(m.target)) {
+    const rng = m.rng;
+    let to = roadPoint(rng);
+    while (Math.hypot(to.x - m.target.x, to.y - m.target.y) < 800) to = roadPoint(rng);
+    m.stage = 'fare-drop';
+    m.target = { x: to.x, y: to.y, r: 110, label: 'the drop-off' };
+    return { event: 'fare', text: 'Passenger aboard. Drive them to the marker.' };
+  }
+
+  if (m.stage === 'fare-drop' && at(m.target)) {
+    return completeJob(world);
+  }
+
+  return null;
 }
 
-export function missionObjective(W) {
-  const m = W.mission;
-  if (!m) {
-    const next = nextMissionDef(W);
-    return `No job — visit ${GARAGE.label} for "${next.title}" ($${next.reward})`;
+function completeJob(world) {
+  const m = world.missions;
+  const reward = m.reward;
+  world.cash += reward;
+  world.debt = Math.max(0, world.debt - reward);
+  world.player.ammo = 24;
+  const jobName = m.index < 3 ? STORY_JOBS[m.index].name : 'Fare';
+  m.done.push(jobName);
+  world.toast = `+ $${reward} — ${jobName} done. Debt: $${world.debt.toLocaleString()}`;
+  world.toastTimer = 4;
+  if (m.index < 2) {
+    startJob(m, m.index + 1);
+  } else if (m.index === 2) {
+    startFare(m);
+  } else {
+    startFare(m);
   }
-  const timer = m.timeLimit > 0 ? ` — ${Math.ceil(m.timer)}s left` : '';
-  const where = m.target ? ` → ${m.target.label}` : '';
-  return `${m.title}: ${m.stage === 'steal' ? 'steal a parked car' : m.stage === 'pickup' ? 'pick it up' : m.stage === 'lose' ? 'lose the cops' : 'deliver it'}${where}${timer}`;
+  return { event: 'complete', reward, job: jobName };
+}
+
+export function currentObjective(world) {
+  const m = world.missions;
+  if (m.stage === 'steal') return 'Steal a parked car (walk up, press E)';
+  if (m.stage === 'pickup') return `Pick up the package on ${m.target.label}`;
+  if (m.stage === 'deliver' && m.index === 0) return 'Deliver the car to Spray & Go';
+  if (m.stage === 'deliver' && m.index === 1) return `Deliver to the north docks — ${Math.ceil(m.timer)}s left`;
+  if (m.stage === 'lose') return 'Lose the cops (wanted level to 0)';
+  if (m.stage === 'deliver' && m.index === 2) return 'Reach the garage';
+  if (m.stage === 'fare-pickup') return 'Pick up the fare at the marker';
+  if (m.stage === 'fare-drop') return 'Drop the fare at the marker';
+  return STORY_JOBS[Math.min(m.index, 2)].brief;
+}
+
+// Where the HUD marker points right now, or null.
+export function objectiveTarget(world) {
+  const m = world.missions;
+  if (m.stage === 'steal') {
+    // Nearest parked car the player has not stolen yet.
+    let best = null;
+    let bestD = Infinity;
+    for (const c of world.cars) {
+      if (c.kind !== 'parked' || c.stolen) continue;
+      const d = Math.hypot(world.player.x - c.x, world.player.y - c.y);
+      if (d < bestD) {
+        bestD = d;
+        best = { x: c.x, y: c.y, r: 80, label: 'a car to steal' };
+      }
+    }
+    return best;
+  }
+  return m.target;
 }

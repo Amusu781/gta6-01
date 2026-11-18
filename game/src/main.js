@@ -1,259 +1,150 @@
-// Palmera Bay — entry point. Builds the world, runs the loop, owns the
-// state machine (title / playing / paused / busted) and the debug hooks
-// the screenshot driver reads: window.__world, window.__gameState,
+// Palmera Bay — entry point. Boots the canvas, runs the loop, owns the
+// screen state machine (title / playing / paused / busted), and exposes the
+// hooks the test driver uses: window.__world, window.__gameState() and
 // window.__shotReady.
-import {
-  WORLD_W, WORLD_H, START_CASH, START_DEBT, START_HEALTH, START_AMMO,
-  PLAYER_SPAWN, GARAGE, SAVE_KEY,
-} from './config.js';
-import { makeRng } from './random.js';
-import { createInput } from './input.js';
-import { createAudio } from './audio.js';
-import { generateCity } from './city.js';
-import {
-  createPlayer, createPeds, createParkedCars, createTraffic,
-  updatePlayer, fireBullet, updateBullets, updatePeds, updateTraffic,
-  syncPolice, updatePolice, nearestParkedCar, stealCar, exitCar,
-  updateWanted, updateParticles,
-} from './actors.js';
-import { takeMission, updateMission, missionObjective } from './missions.js';
-import { drawGame } from './render.js';
-import { stageShot } from './shots.js';
-import { saveGame, loadSave, clearSave } from './save.js';
 
-const params = new URLSearchParams(window.location.search);
-const SHOT = params.get('shot');
-const SEED = parseInt(params.get('seed') || '7', 10) || 7;
+import { WORLD_W, WORLD_H, START_AMMO } from './config.js';
+import { createWorld, updateWorld } from './actors.js';
+import { updateMissions, currentObjective } from './missions.js';
+import { drawWorld } from './render.js';
+import { applyShot } from './shots.js';
+import {
+  initInput, moveVector, pressed, keyDown, consumeClick, mousePos,
+  mouseHeld, endFrameInput,
+} from './input.js';
+import {
+  unlockAudio, toggleMute, engineHum, siren, sfxCash, sfxBusted, sfxPickup,
+} from './audio.js';
+import { loadSave, writeSave } from './save.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-const input = createInput(canvas);
-const audio = createAudio();
-const saved = loadSave();
 
-function createWorld(seed) {
-  const rng = makeRng(seed);
-  const city = generateCity(rng);
-  const player = createPlayer(PLAYER_SPAWN);
-  const cars = [
-    ...createParkedCars(city, rng),
-    ...createTraffic(city, rng, 8),
-  ];
-  const W = {
-    seed, rng, city, audio, input,
-    player,
-    cars,
-    peds: createPeds(city, rng, 14),
-    police: [],
-    bullets: [],
-    particles: [],
-    mission: null,
-    missionsDone: [],
-    cash: START_CASH,
-    debt: START_DEBT,
-    wanted: 0,
-    crimeTimer: 0,
-    state: 'title',
-    message: '',
-    messageTimer: 0,
-    time: 0,
-    saveTimer: 0,
-    hasSave: !!saved,
-    pendingSave: saved,
-    garageSpot: GARAGE,
-    spraySpot: { x: 3150, y: 2150 },
-    camera: { x: 0, y: 0 },
-    aimX: 0,
-    aimY: 0,
-    objectiveText: '',
-  };
-  W.saveGame = () => saveGame(W);
-  return W;
-}
+const params = new URLSearchParams(window.location.search);
+const seed = Number(params.get('seed')) || 7;
 
-let W = createWorld(SEED);
-window.__world = W;
+const save = loadSave();
+const world = createWorld(seed, save);
+initInput(canvas);
+const shotMode = applyShot(world, params);
 
-function applySave() {
-  const s = W.pendingSave;
-  if (!s) return;
-  W.cash = s.cash;
-  W.debt = s.debt;
-  W.missionsDone = [...s.missionsDone];
-  W.player.ammo = s.ammo;
-  W.player.health = s.health;
-  W.message = `Welcome back, Rico. Debt: $${W.debt}.`;
-  W.messageTimer = 3.5;
-}
-
-function resetWorld(seed) {
-  const keepSave = W.pendingSave;
-  W = createWorld(seed);
-  W.pendingSave = keepSave;
-  W.hasSave = !!keepSave;
-  window.__world = W;
-  window.__shotReady = false;
-}
-
-function startGame(useSave) {
-  audio.unlock();
-  if (useSave) applySave();
-  W.state = 'playing';
-  W.message = useSave
-    ? ''
-    : "Marla wants her $5,000. Visit the garage — press E — and take a job.";
-  W.messageTimer = useSave ? 0 : 5;
-}
-
-function respawnAfterBust() {
-  const p = W.player;
-  W.cash = Math.max(0, W.cash - 100);
-  W.debt = W.debt;
-  p.health = START_HEALTH;
-  p.ammo = START_AMMO;
-  p.x = PLAYER_SPAWN.x;
-  p.y = PLAYER_SPAWN.y;
-  if (p.car) {
-    p.car.driver = null;
-    p.car = null;
-    p.onFoot = true;
-  }
-  W.wanted = 0;
-  W.police.length = 0;
-  W.cars = W.cars.filter((c) => c.kind !== 'police');
-  W.audio.sirenOff();
-  W.audio.engineOff();
-  W.state = 'playing';
-  W.message = 'Back on the street. The debt is still $' + W.debt + '.';
-  W.messageTimer = 3.5;
-  W.saveGame();
-}
-
-function interact() {
-  const p = W.player;
-  if (p.car) {
-    exitCar(W);
-    return;
-  }
-  if (takeMission(W)) return;
-  const car = nearestParkedCar(W);
-  if (car) stealCar(W, car);
-}
-
-function update(dt) {
-  W.time += dt;
-  if (W.messageTimer > 0) W.messageTimer -= dt;
-  if (W.messageTimer <= 0) W.message = '';
-  // Global keys.
-  if (input.consume('KeyM')) {
-    const muted = audio.toggleMute();
-    W.message = muted ? 'Sound off.' : 'Sound on.';
-    W.messageTimer = 1.5;
-  }
-  if (W.state === 'title') {
-    if (input.consume('Enter')) startGame(!!W.hasSave);
-    if (input.consume('KeyR')) {
-      clearSave();
-      resetWorld(SEED);
-      startGame(false);
-    }
-    input.endFrame();
-    return;
-  }
-  if (W.state === 'busted') {
-    if (input.consume('Enter')) respawnAfterBust();
-    input.endFrame();
-    return;
-  }
-  if (input.consume('KeyP')) {
-    W.state = W.state === 'paused' ? 'playing' : 'paused';
-    if (W.state === 'paused') {
-      audio.engineOff();
-    }
-    input.endFrame();
-    return;
-  }
-  if (W.state === 'paused') {
-    if (input.consume('KeyR')) {
-      resetWorld((Date.now() % 100000) + 1);
-      startGame(false);
-    }
-    input.endFrame();
-    return;
-  }
-  if (input.consume('KeyR')) {
-    resetWorld((Date.now() % 100000) + 1);
-    startGame(false);
-    input.endFrame();
-    return;
-  }
-  // Playing.
-  audio.unlock();
-  if (input.consume('KeyE')) interact();
-  // Aim: mouse position in world coordinates.
-  W.aimX = W.camera.x + input.mouseX;
-  W.aimY = W.camera.y + input.mouseY;
-  if (input.consume('Space') || input.consume('Mouse0')) {
-    if (!W.player.car && W.player.ammo > 0) {
-      const aim = Math.atan2(W.aimY - W.player.y, W.aimX - W.player.x);
-      fireBullet(W, aim);
-    }
-  }
-  updatePlayer(W, dt, input);
-  updatePeds(W, dt);
-  updateTraffic(W, dt);
-  syncPolice(W, dt);
-  updatePolice(W, dt);
-  updateBullets(W, dt);
-  updateMission(W, dt);
-  updateWanted(W, dt);
-  updateParticles(W, dt);
-  W.objectiveText = missionObjective(W);
-  W.saveTimer += dt;
-  if (W.saveTimer >= 10) {
-    W.saveTimer = 0;
-    W.saveGame();
-  }
-  input.endFrame();
-}
+// Test-driver hooks: the live world, a JSON snapshot, and a ready flag.
+window.__world = world;
+window.__gameState = () => ({
+  screen: world.screen,
+  cash: Math.round(world.cash),
+  debt: Math.round(world.debt),
+  health: Math.round(world.player.health),
+  ammo: world.player.ammo,
+  wanted: world.wanted,
+  objective: currentObjective(world),
+  missionsDone: world.missions.done.slice(),
+  inCar: !!world.player.car,
+  x: Math.round(world.player.x),
+  y: Math.round(world.player.y),
+  speed: Math.round(world.player.speed || 0),
+  police: world.cars.filter((c) => c.kind === 'police').length,
+  cars: world.cars.length,
+  peds: world.peds.length,
+});
+window.__shotReady = false;
 
 let last = performance.now();
-let firstFrameDone = false;
+let frames = 0;
+let lastSave = 0;
+
+function screenToWorld(sx, sy) {
+  return {
+    x: sx - 640 + world.camera.x,
+    y: sy - 360 + world.camera.y,
+  };
+}
+
+function resetRun() {
+  const fresh = loadSave();
+  const again = createWorld(seed, fresh);
+  // Keep the same object identity the driver holds: copy fields over.
+  for (const k of Object.keys(world)) delete world[k];
+  Object.assign(world, again);
+  world.screen = 'playing';
+}
+
 function frame(now) {
-  const dt = Math.min((now - last) / 1000, 0.05);
+  const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
   last = now;
-  update(dt);
-  drawGame(ctx, W, input, canvas.width, canvas.height);
-  if (SHOT && !firstFrameDone) {
-    firstFrameDone = true;
+  frames++;
+
+  const mv = moveVector();
+  const mouse = mousePos();
+  const aim = screenToWorld(mouse.x, mouse.y);
+  const shootPressed = consumeClick() || pressed('Space');
+  const enterPressed = pressed('KeyE');
+  const input = {
+    move: mv,
+    aimX: aim.x,
+    aimY: aim.y,
+    shootPressed,
+    enterPressed,
+  };
+
+  // Global keys.
+  if (pressed('KeyM')) toggleMute();
+  if (pressed('Enter') || pressed('NumpadEnter')) {
+    unlockAudio();
+    if (world.screen === 'title') world.screen = 'playing';
+  }
+  if (world.screen === 'title' && mouseHeld()) {
+    unlockAudio();
+    world.screen = 'playing';
+  }
+  if (pressed('KeyP') && (world.screen === 'playing' || world.screen === 'paused')) {
+    world.screen = world.screen === 'playing' ? 'paused' : 'playing';
+  }
+  if (pressed('KeyR') && world.screen === 'busted') {
+    resetRun();
+  }
+
+  if (world.screen === 'playing') {
+    const before = { cash: world.cash, missions: world.missions.done.length };
+    updateWorld(world, dt, input);
+    const ev = updateMissions(world, dt);
+    if (ev && (ev.event === 'complete' || ev.event === 'pickup' || ev.event === 'stolen')) {
+      if (ev.event === 'complete') sfxCash();
+      if (ev.event === 'pickup') sfxPickup();
+      writeSave(world);
+    }
+    if (world.cash !== before.cash) writeSave(world);
+    // A car under the player at rest re-arms nothing; keep the engine hum
+    // and the siren in step with the world.
+    engineHum(world.player.car ? Math.abs(world.player.car.speed) / 540 : 0, !!world.player.car);
+    const nearPolice = world.cars.some(
+      (c) => c.kind === 'police' && Math.hypot(c.x - world.player.x, c.y - world.player.y) < 700,
+    );
+    siren(world.wanted > 0 && nearPolice);
+    // Periodic save so a crash still keeps the run.
+    if (world.time - lastSave > 15) {
+      lastSave = world.time;
+      writeSave(world);
+    }
+    if (world.screen === 'busted') {
+      sfxBusted();
+      writeSave(world);
+    }
+  } else {
+    engineHum(0, false);
+    siren(false);
+  }
+
+  // In shot mode the scene poses itself; the driver waits on this flag.
+  if (shotMode && frames >= 45 && !window.__shotReady) {
+    window.__shotReady = true;
+  } else if (!shotMode && frames === 5) {
     window.__shotReady = true;
   }
+
+  drawWorld(ctx, world);
+  endFrameInput();
   requestAnimationFrame(frame);
 }
 
-window.__gameState = function gameState() {
-  const p = W.player;
-  return {
-    state: W.state,
-    cash: W.cash,
-    debt: W.debt,
-    wanted: W.wanted,
-    health: Math.round(p.health),
-    ammo: p.ammo,
-    missionsDone: [...W.missionsDone],
-    mission: W.mission ? { id: W.mission.id, stage: W.mission.stage } : null,
-    inCar: !!p.car,
-    x: Math.round(p.x),
-    y: Math.round(p.y),
-    cars: W.cars.length,
-    police: W.police.length,
-    peds: W.peds.length,
-  };
-};
-
-if (SHOT) {
-  stageShot(W, SHOT);
-} else {
-  window.__shotReady = false;
-}
 requestAnimationFrame(frame);

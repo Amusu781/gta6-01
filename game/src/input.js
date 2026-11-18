@@ -1,85 +1,87 @@
-// Keyboard and mouse input, in one place. The game reads `input` each
-// frame; the shot-staging code drives it synthetically instead.
-export function createInput(canvas) {
-  const keys = new Set();
-  const input = {
-    up: false,
-    down: false,
-    left: false,
-    right: false,
-    shoot: false,
-    mouseX: 0,
-    mouseY: 0,
-    mouseDown: false,
-    // Edge-triggered presses, consumed by the game once per frame.
-    pressed: new Set(),
-    key(code) {
-      return keys.has(code);
-    },
-    consume(code) {
-      if (input.pressed.has(code)) {
-        input.pressed.delete(code);
-        return true;
-      }
-      return false;
-    },
-    endFrame() {
-      input.pressed.clear();
-    },
-  };
+// Keyboard + mouse state, tracked once for the whole game.
+// Movement keys are read as a direction vector; edge-triggered keys (E, P, R, M,
+// Enter, Space) are consumed once per press through pressed().
 
-  const DOWN = {
-    KeyW: 'up',
-    ArrowUp: 'up',
-    KeyS: 'down',
-    ArrowDown: 'down',
-    KeyA: 'left',
-    ArrowLeft: 'left',
-    KeyD: 'right',
-    ArrowRight: 'right',
-    Space: 'shoot',
-  };
+const keys = new Set();
+const pressedKeys = new Set();
+let mouseX = 0;
+let mouseY = 0;
+let mouseDown = false;
+let mouseClicked = false;
 
+export function initInput(canvas) {
   window.addEventListener('keydown', (e) => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
       e.preventDefault();
     }
-    if (!e.repeat) input.pressed.add(e.code);
+    if (!e.repeat) pressedKeys.add(e.code);
     keys.add(e.code);
-    const field = DOWN[e.code];
-    if (field) input[field] = true;
   });
-  window.addEventListener('keyup', (e) => {
-    keys.delete(e.code);
-    const field = DOWN[e.code];
-    if (field) input[field] = keys.has('KeyW') || keys.has('ArrowUp') ? true : false;
-    if (field === 'up') input.up = keys.has('KeyW') || keys.has('ArrowUp');
-    if (field === 'down') input.down = keys.has('KeyS') || keys.has('ArrowDown');
-    if (field === 'left') input.left = keys.has('KeyA') || keys.has('ArrowLeft');
-    if (field === 'right') input.right = keys.has('KeyD') || keys.has('ArrowRight');
-    if (field === 'shoot') input.shoot = keys.has('Space') || input.mouseDown;
+  window.addEventListener('keyup', (e) => keys.delete(e.code));
+  window.addEventListener('blur', () => {
+    keys.clear();
+    mouseDown = false;
   });
   canvas.addEventListener('mousemove', (e) => {
     const r = canvas.getBoundingClientRect();
-    input.mouseX = e.clientX - r.left;
-    input.mouseY = e.clientY - r.top;
+    mouseX = e.clientX - r.left;
+    mouseY = e.clientY - r.top;
   });
   canvas.addEventListener('mousedown', (e) => {
     if (e.button === 0) {
-      input.mouseDown = true;
-      input.shoot = true;
-      input.pressed.add('Mouse0');
-      const r = canvas.getBoundingClientRect();
-      input.mouseX = e.clientX - r.left;
-      input.mouseY = e.clientY - r.top;
+      mouseDown = true;
+      mouseClicked = true;
     }
   });
   window.addEventListener('mouseup', (e) => {
-    if (e.button === 0) {
-      input.mouseDown = false;
-      input.shoot = keys.has('Space');
-    }
+    if (e.button === 0) mouseDown = false;
   });
-  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  return input;
+}
+
+export function moveVector() {
+  let x = 0;
+  let y = 0;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) x -= 1;
+  if (keys.has('KeyD') || keys.has('ArrowRight')) x += 1;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) y -= 1;
+  if (keys.has('KeyS') || keys.has('ArrowDown')) y += 1;
+  if (x !== 0 && y !== 0) {
+    const inv = 1 / Math.hypot(x, y);
+    x *= inv;
+    y *= inv;
+  }
+  return { x, y };
+}
+
+export function pressed(code) {
+  if (pressedKeys.has(code)) {
+    pressedKeys.delete(code);
+    return true;
+  }
+  return false;
+}
+
+export function keyDown(code) {
+  return keys.has(code);
+}
+
+export function consumeClick() {
+  const c = mouseClicked;
+  mouseClicked = false;
+  return c;
+}
+
+export function mousePos() {
+  return { x: mouseX, y: mouseY };
+}
+
+export function mouseHeld() {
+  return mouseDown;
+}
+
+// Called once per frame after the game has read input, so a press is never
+// acted on twice.
+export function endFrameInput() {
+  pressedKeys.clear();
+  mouseClicked = false;
 }

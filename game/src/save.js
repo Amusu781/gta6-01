@@ -1,45 +1,40 @@
-// Save and load, through localStorage. One key, one small JSON object:
-// cash, debt, missions done, ammo and health. Saving never throws — a
-// full or blocked store just means the run is not persisted.
-import { SAVE_KEY } from './config.js';
+// Save / load through localStorage. One key, one small JSON object:
+// { cash, debt, missionsDone, best } — everything the next session needs.
 
-export function saveGame(W) {
-  try {
-    const data = {
-      cash: W.cash,
-      debt: W.debt,
-      missionsDone: W.missionsDone,
-      ammo: W.player.ammo,
-      health: W.player.health,
-    };
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-  } catch {
-    // A blocked store must never break the game.
-  }
+import { SAVE_KEY, START_CASH, START_DEBT } from './config.js';
+
+export function freshSave() {
+  return { cash: START_CASH, debt: START_DEBT, missionsDone: [], best: 0 };
 }
 
 export function loadSave() {
   try {
     const raw = window.localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (typeof data.cash !== 'number' || typeof data.debt !== 'number') return null;
+    if (!raw) return freshSave();
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return freshSave();
     return {
-      cash: data.cash,
-      debt: data.debt,
-      missionsDone: Array.isArray(data.missionsDone) ? data.missionsDone : [],
-      ammo: typeof data.ammo === 'number' ? data.ammo : 24,
-      health: typeof data.health === 'number' ? data.health : 100,
+      cash: typeof parsed.cash === 'number' ? parsed.cash : START_CASH,
+      debt: typeof parsed.debt === 'number' ? parsed.debt : START_DEBT,
+      missionsDone: Array.isArray(parsed.missionsDone) ? parsed.missionsDone : [],
+      best: typeof parsed.best === 'number' ? parsed.best : 0,
     };
   } catch {
-    return null;
+    return freshSave();
   }
 }
 
-export function clearSave() {
+export function writeSave(world) {
   try {
-    window.localStorage.removeItem(SAVE_KEY);
+    const data = {
+      cash: Math.round(world.cash),
+      debt: Math.round(world.debt),
+      missionsDone: world.missions.done.slice(),
+      best: Math.max(world.saveBest || 0, world.cash),
+    };
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    return true;
   } catch {
-    // ignore
+    return false;
   }
 }

@@ -1,66 +1,80 @@
-// Palmera Bay — tuning and world constants. All numbers live here so the
-// rest of the game reads like a design, not a spreadsheet.
+// Palmera Bay — shared constants for the open-world crime game.
+// Everything here is plain data: no imports, no side effects.
+
 export const WORLD_W = 3600;
 export const WORLD_H = 2700;
-export const ROAD_W = 120;
-// Road centrelines. The city is a grid; blocks between roads hold buildings.
-export const V_ROADS = [300, 900, 1500, 2100, 2700, 3300];
-export const H_ROADS = [300, 900, 1500, 2100];
+
+export const SAVE_KEY = 'palmera-bay-save-v1';
+
+// Roads: vertical centerlines (x) and horizontal centerlines (y), width in px.
+export const ROADS_V = [360, 860, 1360, 1860, 2360, 2860];
+export const ROADS_H = [360, 960, 1560, 2160];
+export const ROAD_W = 140;
+export const SIDEWALK_W = 34;
+
+// The bay: open water along the whole east edge of the map.
+export const BAY_X = 3300;
+export const PIER = { x0: 3300, x1: 3560, y0: 1200, y1: 1380 };
+
+// Landmarks.
+export const SPRAY_SHOP = { x: 3150, y: 2150, r: 130, name: 'Spray & Go' };
+export const PIER_DROP = { x: 3450, y: 1290, r: 90, name: 'the pier' };
+export const DOCKS_DROP = { x: 360, y: 180, r: 110, name: 'the north docks' };
+export const GARAGE_DROP = { x: 860, y: 360, r: 110, name: 'the garage' };
+
+// Player.
+export const PLAYER_SPAWN = { x: 360, y: 470 };
+export const FOOT_SPEED = 230;
+export const CAR_TOP_SPEED = 540;
+export const CAR_ACCEL = 620;
+export const CAR_BRAKE = 900;
+export const CAR_TURN = 2.6;
+export const START_AMMO = 24;
 export const START_CASH = 120;
 export const START_DEBT = 5000;
-export const START_HEALTH = 100;
-export const START_AMMO = 24;
-export const MAX_AMMO = 24;
-export const MAX_WANTED = 3;
-export const PLAYER_FOOT_SPEED = 210;
-export const CAR_TOP_SPEED = 430;
-export const CAR_ACCEL = 320;
-export const CAR_BRAKE = 520;
-export const CAR_TURN = 2.6;
-export const BULLET_SPEED = 760;
-export const BULLET_RANGE = 520;
-export const BULLET_DAMAGE = 1;
-export const COP_HEALTH = 3;
-export const RAM_DAMAGE = 8;
-export const RAM_COOLDOWN = 0.8;
+export const MAX_HEALTH = 100;
+
+// Wanted level.
+export const WANTED_MAX = 3;
 export const WANTED_DECAY_SECONDS = 25;
-export const INTERACT_RANGE = 110;
-export const SAVE_KEY = 'palmera-bay-save-v1';
-// Places the story uses. The driver teleports the player near the garage
-// (470, 470) and delivers to the spray shop (3150, 2150); keep both exact.
-export const GARAGE = { x: 470, y: 470, label: "Marla's Garage" };
-export const SPRAY_SHOP = { x: 3150, y: 2150, label: 'Spray & Go' };
-export const PIER = { x: 3300, y: 300, label: 'Old Pier' };
-export const CREW_SPOT = { x: 900, y: 2100, label: 'Crew corner' };
-export const PLAYER_SPAWN = { x: 470, y: 560 };
+export const POLICE_RAM_DAMAGE = 8;
+
+// World population.
+export const PED_COUNT = 14;
+export const TRAFFIC_COUNT = 8;
+export const PARKED_COUNT = 10;
+
+// Story jobs: name, reward, and the short objective text shown on the HUD.
+export const STORY_JOBS = [
+  { name: 'Wheels', reward: 500, brief: 'Steal a car and bring it to Spray & Go' },
+  { name: 'Courier Run', reward: 700, brief: 'Grab the package on the pier, deliver it to the north docks in 90s' },
+  { name: 'Getaway', reward: 900, brief: 'Lose the heat, then reach the garage' },
+];
+
+export const FARE_MIN = 120;
+export const FARE_MAX = 250;
+
 // Palette.
 export const COLORS = {
-  grass: '#6f9e57',
-  grassAlt: '#679452',
-  road: '#33373d',
-  roadEdge: '#4a4f57',
-  lane: '#d8c95a',
-  sidewalk: '#9aa0a8',
-  buildingRoof: ['#c96f4a', '#4a7ec9', '#c9a44a', '#7a4ac9', '#4ac9a0', '#c94a6b'],
-  buildingEdge: '#2c2f34',
-  water: '#3f7fb8',
-  pierWood: '#8a6a45',
-  player: '#ff5a3c',
-  playerDark: '#c23a22',
-  ped: ['#f2d16b', '#6bc9f2', '#f28bb0', '#9bf26b', '#f2a35e'],
-  copBody: '#22262b',
-  copTrim: '#f2f2f2',
-  bullet: '#ffe066',
-  minimapBg: 'rgba(12, 16, 22, 0.82)',
-  hudBg: 'rgba(12, 16, 22, 0.72)',
-  hudText: '#f5f2e8',
-  hudAccent: '#ffd34d',
-  danger: '#ff5340',
+  ground: '#23262e',
+  block: '#31363f',
+  sidewalk: '#565d68',
+  road: '#20242c',
+  roadLine: '#c9a227',
+  bay: '#175d75',
+  bayDeep: '#0f4457',
+  pier: '#8a6d3b',
+  pierPost: '#6b5430',
+  buildingRoof: ['#7a5c4e', '#5e6b7a', '#6b5e7a', '#4e6b5e', '#7a6b4e', '#54455e'],
+  buildingWall: '#3d424d',
+  spray: '#c94f4f',
+  player: '#e8b13c',
+  playerCar: '#d8d8d8',
+  police: '#2f6fd0',
+  policeLight: '#ff3b30',
+  traffic: ['#b8442c', '#2c7a4b', '#c9a227', '#4a6b8a', '#8a4a6b'],
+  ped: ['#e07a5f', '#81b29a', '#f2cc8f', '#a78bfa', '#f4a261'],
+  hudBg: 'rgba(12, 14, 18, 0.72)',
+  hudText: '#f2f2e9',
+  marker: '#ffd23f',
 };
-export const CAR_MODELS = [
-  { model: 'Palm Runner', color: '#d94f3d' },
-  { model: 'Bay Cruiser', color: '#3d7fd9' },
-  { model: 'Sunset GT', color: '#e0a13c' },
-  { model: 'Harbor Van', color: '#7a8894' },
-  { model: 'Coral Coupe', color: '#c94f8a' },
-];
