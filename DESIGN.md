@@ -1,72 +1,69 @@
-# Palmera Bay — design
+# Palmera Bay — design notes
 
-An original top-down 2D open-world crime game. Rico Vega, a driver-for-hire,
-owes $5,000 to Marla Quinn, a fixer in the bay-side city of Palmera Bay. He
-works the debt off one job at a time. Nothing in it comes from Rockstar's
-GTA series or any other commercial game: the city, the characters, the cars,
-the story, the art and the sounds are all made here.
+An original top-down 2D open-world crime game. Nothing in it comes from
+Rockstar or any commercial game: the city, the people, the story and the
+sounds are all invented here.
+
+## Story
+
+Rico Vega is a driver-for-hire in Palmera Bay, a port city of straight roads,
+a bay on its east edge and a pier that smells of fish and diesel. He owes
+$5,000 to Marla Quinn, the fixer who owns half the harbour. Every job pays
+the debt down. When the debt hits zero, Rico is free — the game keeps going
+with taxi fares after that.
 
 ## The city
 
-A 3600×2700 grid city: six vertical and four horizontal roads, blocks of
-buildings between them, and a bay along the east edge with a wooden pier.
-Landmarks: Marla's Garage (where jobs start), Spray & Go (where stolen cars
-get delivered), the Old Pier (a courier drop-off), and the crew corner.
+A 3600×2700 grid: six vertical roads, four horizontal roads, sidewalks,
+buildings packed into the blocks, a bay along the east edge and a wooden
+pier sticking out into it. The Spray & Go shop sits in the south-east.
+Everything is generated from one seed, so the same seed rebuilds the same
+city — the screenshots use seed 7.
 
 ## Systems
 
-- **On foot and by car.** Walk the sidewalks, or press E beside a parked car
-  to steal it. Driving is W/S throttle with A/D steering; E gets out again.
-- **Traffic and pedestrians.** Eight traffic cars cruise the road grid and
-  fourteen pedestrians walk the sidewalks; both react to gunfire and police.
-- **Wanted level (0–3 stars).** Stealing a car or shooting a cop raises it.
-  Police spawn and chase, ramming the player. Out of sight for 25 seconds
-  and the heat drops a star.
-- **Missions and story.** Three story jobs — Wheels (steal a car, deliver it
-  to Spray & Go, $500), Courier Run (a package to the Old Pier in 90 seconds,
-  $700), Getaway (pick up the crew, then lose the cops, $900) — then
-  repeatable fares. Every job pays cash and cuts the debt.
-- **Combat.** Mouse or Space shoots toward the cursor; 24 rounds, refilled at
-  the garage. Cop cars take three hits. Getting rammed hurts; at zero health
-  Rico is busted, loses $100, and wakes up at the garage.
-- **HUD and minimap.** Cash, debt, health, ammo, wanted stars, the current
-  objective, and a live minimap with roads, the player, police and the
-  mission marker.
-- **Save.** Cash, debt, completed jobs, ammo and health persist in
-  localStorage (`palmera-bay-save-v1`); the title screen offers Continue.
-- **Sound.** Everything is synthesized with WebAudio: engine hum, gunshots,
-  a two-tone siren, payment blips. M mutes.
+- **On foot and by car.** Walk with WASD or arrows. Press E beside a parked
+  car to steal it (the cops notice), E again to get out. Cars accelerate,
+  brake and steer; walls scrub speed.
+- **Traffic and pedestrians.** Eight traffic cars loop the road grid.
+  Fourteen pedestrians stroll the sidewalks and scatter when shots are
+  fired.
+- **Wanted level, 0–3.** Stealing a car or firing a shot raises it. Police
+  Interceptors spawn, chase and ram. Twenty-five quiet seconds drops a
+  star. Lose all three and the heat is off.
+- **Missions.** Three story jobs — Wheels (steal a car, deliver it to
+  Spray & Go, $500), Courier Run (pier pickup, 90 seconds to the north
+  docks, $700), Getaway (lose a two-star wanted level, then reach the
+  garage, $900) — then repeatable taxi fares. Each completed job refills
+  ammo and writes a save.
+- **Combat.** Mouse click or Space fires toward the cursor. 24 rounds.
+  Bullets spin police cars out and spark off buildings.
+- **HUD and minimap.** Cash, debt, health bar, ammo, wanted stars and the
+  current objective across the top; a live minimap (roads, bay, player,
+  police, objective marker) in the corner. Title, pause and busted
+  screens. P pauses, M mutes, R restarts after a bust.
+- **Save.** Cash, debt and finished jobs persist in localStorage under
+  `palmera-bay-save-v1`, written on every job completion.
 
-## Controls
+## Sound
 
-Enter start/continue · WASD/arrows move and drive · E interact, steal a car,
-get out · Mouse/Space shoot · P pause · M mute · R restart.
+All sound is synthesised with the Web Audio API — an engine hum that
+follows speed, a two-tone siren, a noise-burst gunshot, cash and pickup
+blips. No audio files, no network requests, nothing loaded from outside
+the game's own files.
 
 ## Files
 
-- `game/index.html` — the page; loads `src/main.js` as a module.
-- `game/src/config.js` — tuning, places, palette.
-- `game/src/random.js` — seeded RNG (deterministic shots) and geometry.
-- `game/src/input.js` — keyboard and mouse.
-- `game/src/audio.js` — WebAudio synth sounds.
-- `game/src/city.js` — road grid, buildings, collision.
-- `game/src/actors.js` — player, pedestrians, traffic, police, bullets.
-- `game/src/missions.js` — the three story jobs and fares.
-- `game/src/render.js` — canvas drawing, HUD, minimap, menus.
-- `game/src/shots.js` — deterministic screenshot staging (`?shot=`).
-- `game/src/save.js` — localStorage persistence.
-- `game/src/main.js` — the loop, the state machine, debug hooks.
-- `main.ts` — copies `game/` and `screenshots/` to the output directory and
-  writes `dossier.json` with `buildDossier`.
-- `serve.ts` — a small static server for local play (`node serve.ts`).
-
-## Verification
-
-- `main.ts` run twice with different `MAKEFUN_OUTPUT_DIR` values writes a
-  byte-identical `dossier.json`.
-- The game is driven over CDP: title → Enter → play; E at the garage takes
-  the Wheels job; stealing the Palm Runner raises wanted 0→1 and spawns
-  police; the full mission loop pays $500 (cash $120→$620, debt
-  $5,000→$4,500); the save lands in localStorage; zero console errors.
-- `serve.ts` returns 200 for `/` and game files, 404 for missing files and
-  for raw and URL-encoded path traversal.
+- `game/src/config.js` — constants and the palette
+- `game/src/random.js` — seeded RNG (mulberry32)
+- `game/src/input.js` — keyboard and mouse state
+- `game/src/audio.js` — Web Audio synth effects
+- `game/src/city.js` — city generation and collision
+- `game/src/actors.js` — player, pedestrians, traffic, police
+- `game/src/missions.js` — the job state machine
+- `game/src/render.js` — canvas drawing, HUD, minimap, overlays
+- `game/src/shots.js` — screenshot scene poses (?shot=…)
+- `game/src/save.js` — localStorage save / load
+- `game/src/main.js` — boot, loop, screen states, test hooks
+- `main.ts` — copies game/ + screenshots/ to /output, writes dossier.json
+- `serve.ts` — local static server for playtesting

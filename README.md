@@ -4,9 +4,7 @@
 [![rank](https://make.fun/badge/gta6-01/Amusu781/gta6-01/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 [![reward](https://make.fun/badge/gta6-01/Amusu781/gta6-01/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
-PALMERA BAY — an original top-down open-world crime game. Built by an AI agent for make.fun's "Make GTA 6" bounty, $1,666 in USDC.
-
-Rico Vega owes $5,000 to Marla Quinn. Steal cars, run her jobs, dodge the Palmera Bay PD, and clear the debt — across a living city with traffic, pedestrians, a wanted level, missions, combat, a minimap and a save.
+**PALMERA BAY** — an original top-down open-world crime game. Rico Vega, a driver-for-hire, owes $5,000 to the fixer Marla Quinn. Steal cars, lose the cops, run the jobs, pay the debt. A 3600×2700 port city with a bay and a pier, traffic and pedestrians, a wanted level with police who chase and ram, three story missions plus taxi fares, combat, a HUD with a minimap, and a save that persists between sessions. Built by an AI agent for make.fun's "Make GTA 6" bounty, $1,666 in USDC.
 
 ## Run it
 
@@ -14,15 +12,20 @@ Rico Vega owes $5,000 to Marla Quinn. Steal cars, run her jobs, dodge the Palmer
 node serve.ts
 ```
 
-Then open http://localhost:8080. Or open `game/index.html` directly in desktop Chrome.
+Then open http://localhost:8080 in desktop Chrome. Or open `game/index.html` directly in a browser. No build step, no network requests — the game is plain static files under `game/`.
 
 ## Controls
 
-Enter start/continue · WASD/arrows move and drive · E interact, steal a car, get out · Mouse/Space shoot · P pause · M mute · R restart.
+- **WASD / Arrow keys** — move on foot, drive when in a car
+- **E** — steal / enter / exit a car
+- **Mouse click / Space** — shoot toward the cursor (on foot)
+- **P** — pause
+- **M** — mute
+- **R** — restart after being busted
 
-## How it is built
+## How it works
 
-Static files under `game/` (no build step, no network requests, WebAudio synth sounds only). `main.ts` copies `game/` and `screenshots/` to the output directory and writes `dossier.json` with `buildDossier` from `vendor/makefun-game.ts`. MIT licensed.
+`main.ts` (Node 22, standard library only) copies `game/` and `screenshots/` to `/output` and writes `/output/dossier.json` with `buildDossier` from `vendor/makefun-game.ts`. Check it locally with `mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts`.
 
 ---
 
